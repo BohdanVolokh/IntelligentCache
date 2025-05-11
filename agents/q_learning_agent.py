@@ -7,7 +7,7 @@ from buffers.q_table import QTable
 from domain.object import ObjectData
 
 
-class QAgent:
+class QLearningAgent:
     def __init__(
         self,
         num_actions: int,

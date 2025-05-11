@@ -38,11 +38,11 @@ ETA_START = 0.1
 ETA_MIN = 0.01
 ETA_DECAY_K = 0.01
 
-# Періодичне оновлення моделі логістичної регресії
+#LogReg
 LOGREG_RETRAIN_EVERY = 100  # кожні N запитів агент оновлює модель
-# Шлях до CSV і скрипта навчання логістичної регресії
 LOGREG_CSV_PATH = "train_logreg/train_logreg.csv"
 LOGREG_TRAIN_SCRIPT = "train_logreg/train_logreg.py"
+LOGREG_MODEL_PATH = "train_logreg/logreg_model.pkl"
 
 # Відкладене оновлення
 DELAY_T = 10                   # Через скільки кроків обʼєкт оновлюється
