@@ -2,6 +2,8 @@ from generator.object_generator import ObjectGenerator
 from generator.request_generator import RequestGenerator
 from db.in_memory_db import InMemoryStorage
 
+from threading import Event
+logreg_reload_flag = Event()
 
 # Ініціалізація генераторів та сховища
 object_generator = ObjectGenerator()

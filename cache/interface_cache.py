@@ -1,24 +1,20 @@
-from typing import Protocol, Any, Optional, List, runtime_checkable
+from typing import Protocol, Optional, List, runtime_checkable
+from domain.object import ObjectData
 
 
 @runtime_checkable
 class CacheInterface(Protocol):
-    def get(self, key: Any) -> Optional[Any]:
-        """Повертає об'єкт із кешу за ключем або None, якщо його немає"""
+    def add(self, obj: ObjectData) -> None:
         ...
-
-    def set(self, key: Any, value: Any) -> None:
-        """Додає або оновлює об'єкт у кеші за ключем"""
+    def get(self, object_id: str) -> Optional[ObjectData]:
         ...
-
-    def delete(self, key: Any) -> None:
-        """Видаляє об'єкт із кешу за ключем"""
+    def delete(self, object_id: str) -> None:
         ...
-
-    def keys(self) -> List[Any]:
-        """Повертає список усіх ключів у кеші"""
+    def keys(self) -> List[str]:
         ...
-
     def __len__(self) -> int:
-        """Повертає поточну кількість обʼєктів у кеші"""
+        ...
+    def is_empty(self) -> bool:
+        ...
+    def is_full(self) -> bool:
         ...

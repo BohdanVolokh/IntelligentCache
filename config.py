@@ -33,6 +33,17 @@ EPSILON_START = 0.8            # Початкове ε
 EPSILON_MIN = 0.1              # Мінімальне ε
 EPSILON_DECAY = 0.005          # Швидкість зменшення ε
 
+# LogReg learning rate parameters
+ETA_START = 0.1
+ETA_MIN = 0.01
+ETA_DECAY_K = 0.01
+
+# Періодичне оновлення моделі логістичної регресії
+LOGREG_RETRAIN_EVERY = 100  # кожні N запитів агент оновлює модель
+# Шлях до CSV і скрипта навчання логістичної регресії
+LOGREG_CSV_PATH = "train_logreg/train_logreg.csv"
+LOGREG_TRAIN_SCRIPT = "train_logreg/train_logreg.py"
+
 # Відкладене оновлення
 DELAY_T = 10                   # Через скільки кроків обʼєкт оновлюється
 CHECK_INTERVAL = 0.5           # Частота перевірки готових прикладів
