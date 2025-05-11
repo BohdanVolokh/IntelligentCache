@@ -49,6 +49,6 @@ class QAgent:
             action = self.q_table.argmax(state)  # експлуатація
 
         # Зберігаємо приклад для відкладеного оновлення
-        self.buffer.add(state, str(action), object_data.id, current_index)
+        self.buffer.add(state, action, object_data.id, current_index)
 
         return action
