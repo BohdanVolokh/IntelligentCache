@@ -33,7 +33,11 @@ class QUpdater(threading.Thread):
     def run(self):
         while self.running:
             ready_items = self.buffer.get_ready_objects(self.delay_t)
-            for state, action_str, obj_id, index_at in ready_items:
+            for pending in ready_items:
+                state = pending.state
+                action = pending.action
+                obj_id = pending.object_id
+                index_at = pending.timestamp
                 new_state = simulate_new_state(state)
 
                 # Оцінка винагороди на основі історії запитів
@@ -47,7 +51,7 @@ class QUpdater(threading.Thread):
 
                 self.q_table.update(
                     state=state,
-                    action=int(action_str),
+                    action=action,
                     reward=reward,
                     next_state=new_state,
                     alpha=self.alpha,

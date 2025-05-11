@@ -9,7 +9,7 @@ def plot_cache_hits(results: dict, interval: int = 100):
                     і списком значень кеш-хітів як значенням
     :param interval: крок між вимірюваннями (за замовчуванням 100)
     """
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(10, 10))
 
     for label, values in results.items():
         steps = [interval * i for i in range(1, len(values) + 1)]

@@ -17,12 +17,11 @@ from agents.q_learning_agent import QLearningAgent
 from agents.logreg_agent import LogRegAgent
 from buffers.q_buffer import QBuffer
 from buffers.logreg_buffer import LogRegBuffer
+from buffers.q_table import QTable
 from updater.logreg_updater import LogRegUpdater
 from updater.q_updater import QUpdater
-from buffers.q_table import QTable
-
 # --- Ініціалізація ---
-cache = InMemoryCache(max_size=CACHE_CAPACITY)
+int_cache = InMemoryCache(max_size=CACHE_CAPACITY)
 lru_cache = LRUCache(max_size=CACHE_CAPACITY)
 lfu_cache = LFUCache(max_size=CACHE_CAPACITY)
 
@@ -45,7 +44,7 @@ q_agent = QLearningAgent(
 logreg_agent = LogRegAgent(
     model_path=LOGREG_MODEL_PATH,
     buffer=logreg_buffer,
-    cache=cache,
+    cache=int_cache,
     reload_flag=reload_flag
 )
 
@@ -87,11 +86,8 @@ for i in range(len(requests)):
     object_id = req["object_id"]
     obj = all_objects[object_id]
 
-    in_cache = cache.get(object_id) is not None
 
     # --- Підрахунок хітів ---
-    if in_cache:
-        int_hits += 1
     if lru_cache.get(object_id) is not None:
         lru_hits += 1
     else:
@@ -101,14 +97,16 @@ for i in range(len(requests)):
     else:
         lfu_cache.add(obj)
 
-    if not in_cache:
+    if int_cache.get(object_id) is None:
         action = q_agent.act(object_data=obj, current_index=i)
         if action == 1:
-            if cache.is_full():
+            if int_cache.is_full():
                 to_evict = logreg_agent.act(current_index=i)
                 if to_evict:
-                    cache.delete(to_evict)
-            cache.set(object_id, obj)
+                    int_cache.delete(to_evict)
+            int_cache.add(obj)
+    else:
+        int_hits += 1
 
     logreg_updater.set_current_index(i)
     q_updater.set_current_index(i)
@@ -129,4 +127,4 @@ plot_cache_hits({
     "Intellectual (QLearn + LogReg)": smart_curve,
     "LRU": lru_curve,
     "LFU": lfu_curve
-})
+}, interval)

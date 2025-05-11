@@ -46,7 +46,7 @@ class LogRegUpdater(threading.Thread):
         new_rows = []
 
         for obj in ready:
-            label = int(was_requested_since(obj.object_id, obj.timestamp, self.requests))
+            label = int(was_requested_since(obj.object_id, obj.timestamp, self.requests, self.current_index))
             row = obj.features + [label]
             new_rows.append(row)
 
