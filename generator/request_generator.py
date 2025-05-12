@@ -20,4 +20,4 @@ class RequestGenerator:
         return requests
 
     def get_requests(self) -> List[Dict]:
-        return self.requests;
+        return self.requests

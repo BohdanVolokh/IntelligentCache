@@ -1,27 +1,18 @@
+from config import FEATURE_RANGES, FEATURE_KEYS
 import random
 
-from config import FEATURE_KEYS, FEATURE_RANGES
-
-
-def normalize_features(features: list[int]) -> list[float]:
-    """
-    Нормалізує кожну ознаку до діапазону [0.0, 1.0]
-    """
-    normalized = []
-    for i, x in enumerate(features):
-        key = FEATURE_KEYS[i]
-        low, high = FEATURE_RANGES[key]
-        norm = (x - low) / (high - low) if high > low else 0.0
-        normalized.append(norm)
-    return normalized
-
-
 def simulate_new_state(old_state: list[float]) -> list[float]:
-    """
-    Імітація нового стану: кожна ознака трохи змінюється в межах [-0.05, +0.05],
-    але залишається в діапазоні [0.0, 1.0].
-    """
-    return [
-        max(0.0, min(1.0, x + random.uniform(-0.05, 0.05)))
-        for x in old_state
-    ]
+    new_state = []
+    for i, key in enumerate(FEATURE_KEYS):
+        low, high = FEATURE_RANGES[key]
+        range_span = high - low
+
+        # Якщо ознака категоріальна (невелика кількість значень), залишаємо без змін
+        if range_span <= 2:
+            new_value = old_state[i]
+        else:
+            delta = random.uniform(-0.05 * range_span, 0.05 * range_span)
+            new_value = max(low, min(high, old_state[i] + delta))
+
+        new_state.append(round(new_value))  # або без round, якщо хочеш float
+    return new_state

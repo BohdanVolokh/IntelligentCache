@@ -44,3 +44,13 @@ class QTable:
         state_key = self._serialize_state(state)
         with self.lock:
             return max(self.q_values[state_key], key=self.q_values[state_key].get)
+
+    # --- Додано для підтримки серіалізації ---
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state['lock']
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.lock = Lock()

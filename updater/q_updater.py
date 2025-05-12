@@ -28,10 +28,15 @@ class QUpdater(threading.Thread):
         self.delay_t = delay_t
         self.check_interval = check_interval
         self.running = True
-        self.current_index = 0  # Оновлюється ззовні через set_current_index()
+        self.current_index = 0
+        self.index_lock = threading.Lock()
 
     def run(self):
+        print("[QUpdater] 🔄 Потік запущено", flush=True)
         while self.running:
+            with self.index_lock:
+                index_copy = self.current_index
+
             ready_items = self.buffer.get_ready_objects(self.delay_t)
             for pending in ready_items:
                 state = pending.state
@@ -40,12 +45,11 @@ class QUpdater(threading.Thread):
                 index_at = pending.timestamp
                 new_state = simulate_new_state(state)
 
-                # Оцінка винагороди на основі історії запитів
                 was_req = was_requested_since(
                     requests=self.requests,
                     object_id=obj_id,
                     start_time=index_at,
-                    end_time=self.current_index
+                    end_time=index_copy
                 )
                 reward = 1.0 if was_req else 0.0
 
@@ -61,9 +65,8 @@ class QUpdater(threading.Thread):
             time.sleep(self.check_interval)
 
     def stop(self):
-        """Зупиняє потік оновлення."""
         self.running = False
 
     def set_current_index(self, index: int):
-        """Встановлює поточну мітку часу для оцінки запитів."""
-        self.current_index = index
+        with self.index_lock:
+            self.current_index = index

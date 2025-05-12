@@ -5,6 +5,7 @@ from config import (
     LOGREG_MODEL_PATH,
     ALPHA, GAMMA, EPSILON_START, EPSILON_MIN, EPSILON_DECAY
 )
+
 from domain.object import ObjectData
 from generator.object_generator import ObjectGenerator
 from generator.request_generator import RequestGenerator
@@ -12,6 +13,10 @@ from generator.request_generator import RequestGenerator
 from cache.in_memory_cache import InMemoryCache
 from cache.classics import LRUCache, LFUCache
 from utils.plotter import plot_cache_hits
+from utils.persistent import (
+    save_objects, load_objects,
+    save_q_table, load_q_table
+)
 
 from agents.q_learning_agent import QLearningAgent
 from agents.logreg_agent import LogRegAgent
@@ -20,6 +25,22 @@ from buffers.logreg_buffer import LogRegBuffer
 from buffers.q_table import QTable
 from updater.logreg_updater import LogRegUpdater
 from updater.q_updater import QUpdater
+
+from utils.init_helpers import init_logreg
+from utils.reset import reset_all  # <--- reset імпортовано
+
+# --- [!] РОЗКОМЕНТУЙ ЦЕ ДЛЯ ПОВНОГО СКИДАННЯ ВСІХ ДАНИХ ---
+#reset_all()
+
+import random
+import numpy as np
+random.seed(42)
+np.random.seed(42)
+print("[Seed] ✅ Використовується фіксований random seed (режим стабільного тестування)")
+
+# --- Створення початкового CSV і моделі, якщо треба ---
+init_logreg()
+
 # --- Ініціалізація ---
 int_cache = InMemoryCache(max_size=CACHE_CAPACITY)
 lru_cache = LRUCache(max_size=CACHE_CAPACITY)
@@ -27,7 +48,7 @@ lfu_cache = LFUCache(max_size=CACHE_CAPACITY)
 
 q_buffer = QBuffer(delay_T=DELAY_T)
 logreg_buffer = LogRegBuffer(delay_T=DELAY_T)
-q_table = QTable(2)
+q_table = load_q_table()
 reload_flag = Event()
 
 q_agent = QLearningAgent(
@@ -49,7 +70,10 @@ logreg_agent = LogRegAgent(
 )
 
 obj_gen = ObjectGenerator()
-all_objects = {obj.id: obj for obj in obj_gen.generate_batch(NUM_OBJECTS)}
+all_objects = load_objects()
+if not all_objects:
+    all_objects = {obj.id: obj for obj in obj_gen.generate_batch(NUM_OBJECTS)}
+    save_objects(all_objects)
 
 req_gen = RequestGenerator(object_ids=list(all_objects.keys()))
 requests = req_gen.generate_requests(NUM_REQUESTS)
@@ -86,7 +110,6 @@ for i in range(len(requests)):
     object_id = req["object_id"]
     obj = all_objects[object_id]
 
-
     # --- Підрахунок хітів ---
     if lru_cache.get(object_id) is not None:
         lru_hits += 1
@@ -115,6 +138,9 @@ for i in range(len(requests)):
         smart_curve.append(int_hits / (i + 1))
         lru_curve.append(lru_hits / (i + 1))
         lfu_curve.append(lfu_hits / (i + 1))
+
+# --- Збереження результатів ---
+save_q_table(q_table)
 
 # --- Підсумки ---
 print("\n--- Результати ---")

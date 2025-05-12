@@ -1,7 +1,6 @@
 import random
 from typing import List
 from domain.object import ObjectData
-from utils.features import normalize_features
 
 
 class ObjectGenerator:
