@@ -23,6 +23,7 @@ class LogRegAgent:
         self.model = joblib.load(model_path)
 
     def act(self, current_index: int) -> Optional[str]:
+        #print(f"[LogRegAgent] 📝 {current_index}", flush=True)
         if self.reload_flag.is_set():
             self.reload_model()
             self.reload_flag.clear()

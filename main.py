@@ -1,9 +1,22 @@
+# --- 📦 Стандартна бібліотека ---
+import argparse
+import csv
+import os
+import json
+import random
 from threading import Event
+
+import numpy as np
+
+# --- 📁 Внутрішні модулі ---
 from config import (
     CACHE_CAPACITY, NUM_OBJECTS, NUM_REQUESTS, DELAY_T,
     CHECK_INTERVAL,
     LOGREG_MODEL_PATH,
-    ALPHA, GAMMA, EPSILON_START, EPSILON_MIN, EPSILON_DECAY
+    ALPHA, GAMMA, EPSILON_START, EPSILON_MIN, EPSILON_DECAY,
+    ETA_START, ETA_MIN, ETA_DECAY_K,
+    STATS_FILE,
+    PARAMS_PATH, params
 )
 
 from domain.object import ObjectData
@@ -12,28 +25,31 @@ from generator.request_generator import RequestGenerator
 
 from cache.in_memory_cache import InMemoryCache
 from cache.classics import LRUCache, LFUCache
-from utils.plotter import plot_cache_hits
+
 from utils.persistent import (
     save_objects, load_objects,
     save_q_table, load_q_table
 )
+from utils.init_helpers import init_logreg
+from utils.shared_index import SharedIndex
 
 from agents.q_learning_agent import QLearningAgent
 from agents.logreg_agent import LogRegAgent
+
 from buffers.q_buffer import QBuffer
 from buffers.logreg_buffer import LogRegBuffer
-from buffers.q_table import QTable
-from updater.logreg_updater import LogRegUpdater
+
 from updater.q_updater import QUpdater
+from updater.logreg_updater import LogRegUpdater
 
-from utils.init_helpers import init_logreg
-from utils.reset import reset_all  # <--- reset імпортовано
+parser = argparse.ArgumentParser()
+parser.add_argument("--reset", type=int, default=0)
+args = parser.parse_args()
 
-# --- [!] РОЗКОМЕНТУЙ ЦЕ ДЛЯ ПОВНОГО СКИДАННЯ ВСІХ ДАНИХ ---
-#reset_all()
+if args.reset:
+    from utils.reset import reset_all
+    reset_all()
 
-import random
-import numpy as np
 random.seed(42)
 np.random.seed(42)
 print("[Seed] ✅ Використовується фіксований random seed (режим стабільного тестування)")
@@ -78,20 +94,21 @@ if not all_objects:
 req_gen = RequestGenerator(object_ids=list(all_objects.keys()))
 requests = req_gen.generate_requests(NUM_REQUESTS)
 
+shared_index = SharedIndex(0)
 q_updater = QUpdater(
     buffer=q_buffer,
     q_table=q_table,
     requests=requests,
-    alpha=ALPHA,
-    gamma=GAMMA,
-    delay_t=DELAY_T,
-    check_interval=CHECK_INTERVAL
+    check_interval=CHECK_INTERVAL,
+    shared_index=shared_index
 )
 
 logreg_updater = LogRegUpdater(
     buffer=logreg_buffer,
     requests=requests,
-    reload_flag=reload_flag
+    reload_flag=reload_flag,
+    check_interval=CHECK_INTERVAL,
+    shared_index=shared_index
 )
 
 q_updater.start()
@@ -101,7 +118,6 @@ int_hits = 0
 lru_hits = 0
 lfu_hits = 0
 
-smart_curve, lru_curve, lfu_curve = [], [], []
 interval = 100
 
 # --- Основний цикл ---
@@ -109,6 +125,8 @@ for i in range(len(requests)):
     req = requests[i]
     object_id = req["object_id"]
     obj = all_objects[object_id]
+
+    shared_index.set(i)
 
     # --- Підрахунок хітів ---
     if lru_cache.get(object_id) is not None:
@@ -119,7 +137,6 @@ for i in range(len(requests)):
         lfu_hits += 1
     else:
         lfu_cache.add(obj)
-
     if int_cache.get(object_id) is None:
         action = q_agent.act(object_data=obj, current_index=i)
         if action == 1:
@@ -131,26 +148,52 @@ for i in range(len(requests)):
     else:
         int_hits += 1
 
-    logreg_updater.set_current_index(i)
-    q_updater.set_current_index(i)
 
-    if (i + 1) % interval == 0:
-        smart_curve.append(int_hits / (i + 1))
-        lru_curve.append(lru_hits / (i + 1))
-        lfu_curve.append(lfu_hits / (i + 1))
+print("[Main] ⏳ Очікування завершення роботи апдейтерів...")
+
+q_updater.stop()
+logreg_updater.stop()
+q_updater.join()
+logreg_updater.join()
 
 # --- Збереження результатів ---
 save_q_table(q_table)
 
-# --- Підсумки ---
-print("\n--- Результати ---")
-print(f"Загальна кількість запитів:     {NUM_REQUESTS}")
-print(f"Кеш-хіти (Intellectual):        {int_hits}")
-print(f"Кеш-хіти (LRU):                 {lru_hits}")
-print(f"Кеш-хіти (LFU):                 {lfu_hits}")
+with open(STATS_FILE, "a", newline="") as f:
+    writer = csv.writer(f)
+    writer.writerow([int_hits, lru_hits, lfu_hits])
 
-plot_cache_hits({
-    "Intellectual (QLearn + LogReg)": smart_curve,
-    "LRU": lru_curve,
-    "LFU": lfu_curve
-}, interval)
+params["EPSILON_START"] = max(EPSILON_MIN, EPSILON_START * (1 - EPSILON_DECAY))
+params["ETA_START"] = max(ETA_MIN, ETA_START * (1 - ETA_DECAY_K))
+
+with open(PARAMS_PATH, "w") as f:
+    json.dump(params, f, indent=2)
+
+print(f"[Main] 🔁 Оновлено ε={params['EPSILON_START']:.4f}, η={params['ETA_START']:.4f}")
+
+
+# # -- Додаткова інформація про конфігурацію ---
+# print("\n--- Конфігурація експерименту ---")
+# print(f"Кількість унікальних обʼєктів:   {NUM_OBJECTS}")
+# print(f"Обʼєм кешу:                      {CACHE_CAPACITY}")
+# print(f"Загальна кількість запитів:      {NUM_REQUESTS}")
+#
+# # --- Підсумки ---
+# print("\n--- Результати ---")
+# print(f"Кеш-хіти (Intellectual):        {int_hits}")
+# print(f"Кеш-хіти (LRU):                 {lru_hits}")
+# print(f"Кеш-хіти (LFU):                 {lfu_hits}")
+#
+# # --- Порівняння у відсотках ---
+# improvement_vs_lru = 100 * (int_hits - lru_hits) / lru_hits
+# improvement_vs_lfu = 100 * (int_hits - lfu_hits) / lfu_hits
+#
+# print(f"\nПокращення порівняно з LRU:     {improvement_vs_lru:.2f}%")
+# print(f"Покращення порівняно з LFU:     {improvement_vs_lfu:.2f}%")
+#
+# if improvement_vs_lru > 2. or improvement_vs_lru > 2.:
+#     plot_cache_hits({
+#         "Intellectual (QLearn + LogReg)": smart_curve,
+#         "LRU": lru_curve,
+#         "LFU": lfu_curve
+#     }, interval)

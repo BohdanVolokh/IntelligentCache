@@ -29,7 +29,7 @@ def train_logreg(csv_path: str = LOGREG_CSV_PATH, model_path: str = LOGREG_MODEL
     model.fit(X, y)
     joblib.dump(model, model_path)
 
-    print(f"Збережено модель у {model_path} (η_t = {eta:.5f})")
+    print(f"Збережено модель у {model_path} (η_t = {eta:.5f})", flush=True)
 
 if __name__ == "__main__":
     train_logreg()

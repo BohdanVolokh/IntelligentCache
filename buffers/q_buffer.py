@@ -16,7 +16,7 @@ class QBuffer:
         self.delay_T = delay_T
         self.lock = Lock()
 
-    def add(self, state: List[float], action: str, object_id: str, current_index: int):
+    def add(self, state: List[float], action: int, object_id: str, current_index: int):
         with self.lock:
             self.buffer.append(PendingQObject(state, action, object_id, current_index))
 

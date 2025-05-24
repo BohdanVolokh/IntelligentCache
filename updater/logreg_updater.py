@@ -8,11 +8,11 @@ from threading import Event
 
 from buffers.logreg_buffer import LogRegBuffer
 from utils.history import was_requested_since
+from utils.shared_index import SharedIndex
 from config import (
-    CHECK_INTERVAL,
     LOGREG_CSV_PATH,
     LOGREG_TRAIN_SCRIPT,
-    LOGREG_RETRAIN_EVERY,
+    LOGREG_RETRAIN_EVERY, CHECK_INTERVAL,
 )
 
 
@@ -21,42 +21,44 @@ class LogRegUpdater(threading.Thread):
         self,
         buffer: LogRegBuffer,
         requests: List[Dict],
-        reload_flag: Event
+        reload_flag: Event,
+        check_interval: float,
+        shared_index: SharedIndex
     ):
         super().__init__(daemon=True)
         self.buffer = buffer
         self.requests = requests
         self.reload_flag = reload_flag
         self.csv_path = LOGREG_CSV_PATH
-        self.current_index = 0
-        self.index_lock = threading.Lock()
+        self.shared_index = shared_index
+        self.check_interval = check_interval
+        self.running = True
+        self.last_trained_line_count = 0
 
     def run(self):
         print("[LogRegUpdater] 🔄 Потік запущено", flush=True)
-        while True:
-            time.sleep(CHECK_INTERVAL)
+        while self.running:
             self.process_ready_objects()
+            time.sleep(self.check_interval)
 
-    def set_current_index(self, index: int):
-        with self.index_lock:
-            self.current_index = index
+    def stop(self):
+        self.running = False  # метод зупинки
 
     def process_ready_objects(self):
-        with self.index_lock:
-            index_copy = self.current_index
-
+        index_copy = self.shared_index.get()
         ready = self.buffer.get_ready_objects(index_copy)
         if not ready:
+            #print(f"[LogRegUpdater] 🔄 None {index_copy}", flush=True)
             return
 
         new_rows = []
         for obj in ready:
-            label = int(was_requested_since(
+            label = was_requested_since(
                 obj.object_id,
                 obj.timestamp,
                 self.requests,
                 index_copy
-            ))
+            )
             row = obj.features + [label]
             new_rows.append(row)
 
@@ -72,10 +74,13 @@ class LogRegUpdater(threading.Thread):
 
     def trigger_training(self):
         with open(self.csv_path, "r") as f:
-            num_lines = sum(1 for _ in f) - 1  # -1 бо перший рядок — заголовок
+            num_lines = sum(1 for _ in f) - 1
 
-        if num_lines > 0 and num_lines % LOGREG_RETRAIN_EVERY == 0:
-            print(f"[LogRegUpdater] ✅ {num_lines} прикладів — запускаю навчання...", flush=True)
+        new_examples = num_lines - self.last_trained_line_count
+
+        if new_examples >= LOGREG_RETRAIN_EVERY:
+            print(f"[LogRegUpdater] ✅ {new_examples} прикладів — запускаю навчання...", flush=True)
             subprocess.run(["python", LOGREG_TRAIN_SCRIPT])
             self.reload_flag.set()
+            self.last_trained_line_count = num_lines
             print("[LogRegUpdater] 🚩 Флаг оновлення встановлено (модель потребує reload)", flush=True)

@@ -24,6 +24,8 @@ class LogRegBuffer:
         with self.lock:
             while self.buffer and current_index - self.buffer[0].timestamp >= self.delay_T:
                 ready.append(self.buffer.popleft())
+
+        #print(f"[LogRegUpdater] 🔄 Buffer Len {len(ready)}, Current index: {current_index}", flush=True)
         return ready
 
     def size(self) -> int:
